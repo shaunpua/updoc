@@ -4,4 +4,6 @@
 
 Test command
 
-` go run ./cmd/updoc -body "<p>updated from CLI at $(date)</p>"`
+` go run ./cmd/server &`
+
+`curl http://localhost:8080/v1/docs/622593`
