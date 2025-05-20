@@ -11,14 +11,29 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/shaunpua/updoc/internal/doc"
 	"github.com/shaunpua/updoc/internal/providers/confluence"
+	"github.com/shaunpua/updoc/internal/storage/gormstore"
 	transport "github.com/shaunpua/updoc/internal/transport/http"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
 	_ = godotenv.Load()
 
+	dsn := "host=localhost user=updoc password=updoc dbname=updoc port=5432 sslmode=disable"
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := gormstore.AutoMigrate(gormDB); err != nil {
+		log.Fatal(err)
+	}
+
+	userRepo := gormstore.NewUserRepo(gormDB)
+	_ = userRepo.Ensure("u-123", "demo user")
+
 	confClient := confluence.New() // your existing wrapper
-	store := doc.NewInMemStore()
+	store := gormstore.NewFlagRepo(gormDB)
 	svc := doc.New(confClient, store)
 	e := transport.NewRouter(svc)
 

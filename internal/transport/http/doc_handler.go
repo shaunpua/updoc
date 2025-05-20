@@ -12,18 +12,23 @@ type DocHandler struct {
 	Svc interface {
 		GetPage(string) (*confluence.PageResp, error)
 		UpdatePage(pageID, html, status string) (doc.DocFlag, error)
-		ListFlags(pageID string) []doc.DocFlag
+		ListFlags(pageID string) ([]doc.DocFlag, error)
 	}
 }
 
 func (h *DocHandler) GetDoc(c echo.Context) error {
 	id := c.Param("id")
+
 	page, err := h.Svc.GetPage(id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
-	// inline flags for convenience
-	flags := h.Svc.ListFlags(id)
+
+	flags, err := h.Svc.ListFlags(id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+
 	return c.JSON(http.StatusOK, echo.Map{
 		"page":  page,
 		"flags": flags,

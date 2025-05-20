@@ -8,14 +8,14 @@ import (
 	"github.com/shaunpua/updoc/internal/providers/confluence"
 )
 
-var defaultUser = User{ID: "u-123", Name: "shun (hard-coded)"}
+var defaultUser = User{ID: "u-123", Name: "demo-user"}
 
 type Service struct {
 	Client *resty.Client
-	Store  *InMemStore
+	Store  FlagStore
 }
 
-func New(client *resty.Client, store *InMemStore) *Service {
+func New(client *resty.Client, store FlagStore) *Service {
 	return &Service{Client: client, Store: store}
 }
 
@@ -46,6 +46,6 @@ func (s *Service) UpdatePage(pageID, html, status string) (DocFlag, error) {
 	return flag, nil
 }
 
-func (s *Service) ListFlags(pageID string) []DocFlag {
-	return s.Store.FlagsByPage(pageID)
+func (s *Service) ListFlags(pageID string) ([]DocFlag, error) {
+	return s.Store.ByPage(pageID)
 }
