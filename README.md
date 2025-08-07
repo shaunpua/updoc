@@ -17,3 +17,4 @@ docker exec -it $(docker compose ps -q db) \
 
 docker exec -it $(docker compose ps -q db) \
  psql -U updoc updoc -c "select flag_id,page_id,status from flags;"
+# Additional documentation will be added here
