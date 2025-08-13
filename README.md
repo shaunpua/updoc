@@ -1,97 +1,170 @@
-# UpDoc - Universal Documentation Management
+# UpDoc - Simplified Documentation Flagging System
 
-A monorepo containing the full-stack UpDoc application for flagging and tracking documentation updates across teams.
+**Clean, focused MVP for organization and user management with Confluence integration.**
 
 ## Quick Start
 
-### 1. **Environment Setup**
+1. **Start Database:**
+   ```bash
+   cd backend && docker compose up -d
+   ```
 
+2. **Start Server:**
+   ```bash
+   cd backend && go run ./cmd/server
+   ```
+
+3. **Create Organization:**
+   ```bash
+   curl -X POST http://localhost:9000/api/v1/orgs \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Your Company",
+       "user_name": "Admin User", 
+       "user_email": "admin@company.com"
+     }'
+   ```
+
+## Core Features
+
+- ✅ **Organization Management**: Create organizations with admin users
+- ✅ **User Creation**: Automatic admin user creation with organizations  
+- ✅ **Confluence Integration**: Store Confluence credentials per organization
+- ✅ **Connection Testing**: Test Confluence API connectivity
+- ✅ **PostgreSQL Storage**: Persistent data with GORM
+
+## API Endpoints
+
+### Organizations
+
+**Create Organization + Admin User:**
 ```bash
-# Copy environment templates
-cp backend/.env.example backend/.env
-cp frontend/.env.local.example frontend/.env.local
-# Edit .env files with your configuration
+POST /api/v1/orgs
+{
+  "name": "Acme Corp",
+  "user_name": "John Doe",
+  "user_email": "john@acme.com",
+  "confluence_base_url": "https://acme.atlassian.net/wiki",
+  "confluence_email": "john@acme.com", 
+  "confluence_token": "your-token",
+  "confluence_space_key": "ENG"
+}
 ```
 
-### 2. **Development (Full Stack)**
-
+**Get Organization:**
 ```bash
-# One command to rule them all
-make quickstart
-
-# Or manually:
-make setup  # Install dependencies
-make dev    # Start everything
+GET /api/v1/orgs/{slug}
 ```
 
-### 3. **Access the Application**
+**Test Confluence Connection:**
+```bash
+POST /api/v1/orgs/{id}/test-confluence
+```
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:9000
-- **Database**: localhost:5432
+**List Confluence Pages:**
+```bash
+GET /api/v1/orgs/{id}/confluence/pages?limit=10
+```
 
-2. **Test everything works:**
+## Database Schema
 
-   ```bash
-   ./test-mvp.sh  # Automated validation script
-   ```
+```sql
+-- Organizations table
+organizations:
+  id (uuid, primary key)
+  name (text)
+  slug (text, unique)
+  confluence_base_url (text)
+  confluence_email (text)
+  confluence_token (text)
+  confluence_space_key (text)
+  created_at (timestamp)
 
-3. **Start development:**
-
-   ```bash
-   docker compose up -d db
-   go run ./cmd/server/
-   ```
-
-4. **Test the API:**
-   ```bash
-   curl http://localhost:9000/health
-   curl http://localhost:9000/v1/docs/YOUR_CONFLUENCE_PAGE_ID
-   ```
-
-**See [Setup Guide](docs/SETUP_GUIDE.md) for detailed instructions.**
-
-## Documentation
-
-| Document                                                   | Purpose                                                  |
-| ---------------------------------------------------------- | -------------------------------------------------------- |
-| **[Setup Guide](docs/SETUP_GUIDE.md)**                     | Complete setup instructions and testing (start here)     |
-| **[MVP Roadmap](docs/MVP_ROADMAP.md)**                     | 6-week plan from foundation to validation                |
-| **[Architecture Guide](docs/ARCHITECTURE.md)**             | Simple overview and MVP strategy                         |
-| **[Complete Architecture](docs/COMPLETE_ARCHITECTURE.md)** | Full system design for universal doc management          |
-| **[Integration Setup](docs/INTEGRATION_SETUP.md)**         | Step-by-step integration connection process              |
-| **[System Architecture](docs/SYSTEM_ARCHITECTURE.md)**     | Technical component interactions and data flows          |
-| **[Developer Guide](docs/DEVELOPER.md)**                   | Code structure, API reference, and development workflows |
-| **[Operations Guide](docs/OPERATIONS.md)**                 | Commands, deployment, monitoring, and troubleshooting    |
-
-## Features
-
-- **Document Flagging**: Mark Confluence pages as needing updates
-- **Status Tracking**: Track document states (pending-update, stale, fresh)
-- **REST API**: Simple HTTP interface for document operations
-- **Database Persistence**: PostgreSQL storage with automatic migrations
-- **Extensible Design**: Ready for Teams integration and additional doc providers
-
-## Core API
-
-- `GET /v1/docs/:id` - Get document details and flags
-- `POST /v1/docs/:id` - Update document and/or create flags
-- `GET /health` - Health check endpoint
+-- Users table  
+users:
+  id (uuid, primary key)
+  email (text, unique)
+  name (text)
+  org_id (uuid, foreign key)
+  role (text, default: 'member')
+  is_active (boolean, default: true)
+  created_at (timestamp)
+```
 
 ## Tech Stack
 
-- **Backend**: Go 1.23 with Echo framework
-- **Database**: PostgreSQL with GORM ORM
-- **External**: Confluence REST API integration
-- **Deployment**: Docker Compose ready
+- **Backend**: Go 1.23 + Echo framework
+- **Database**: PostgreSQL with GORM
+- **Integration**: Confluence REST API via Resty
+- **Deployment**: Docker Compose
+
+## Environment Variables
+
+```bash
+# Database (optional - defaults provided)
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5433
+POSTGRES_USER=updoc  
+POSTGRES_PASSWORD=updoc
+POSTGRES_DB=updoc
+
+# Server
+PORT=9000
+```
+
+## Development
+
+1. **Run Tests:**
+   ```bash
+   go test ./...
+   ```
+
+2. **Database Reset:**
+   ```bash
+   docker compose down -v && docker compose up -d
+   ```
+
+3. **View Logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
+## Testing Examples
+
+```bash
+# Create organization
+curl -X POST http://localhost:9000/api/v1/orgs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "DevOps Team",
+    "user_name": "Bob Wilson",
+    "user_email": "bob@devops.com",
+    "confluence_base_url": "https://mycompany.atlassian.net/wiki",
+    "confluence_email": "bob@devops.com",
+    "confluence_token": "your-real-token",
+    "confluence_space_key": "DEV"
+  }'
+
+# Get organization
+curl http://localhost:9000/api/v1/orgs/devops-team
+
+# Test Confluence connection  
+curl -X POST http://localhost:9000/api/v1/orgs/{org-id}/test-confluence
+
+# List Confluence pages
+curl http://localhost:9000/api/v1/orgs/{org-id}/confluence/pages?limit=5
+```
 
 ## Next Steps
 
-This project is architected to support:
+This is a clean MVP focused on the core features. Future enhancements:
 
-- Microsoft Teams integration (message extensions, bots, adaptive cards)
-- Additional document providers (Notion, etc.)
-- Webhook-based automatic flagging
-- Notification systems and workflows
+- Document management and flagging
+- Team workspace creation  
+- Integration with Teams/Slack
+- Advanced user permissions
+- Notification system
 
-See the [Architecture Guide](docs/ARCHITECTURE.md) for detailed integration planning.
+---
+
+**Status**: ✅ **Ready for testing organization and user creation with Confluence integration**

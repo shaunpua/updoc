@@ -1,6 +1,22 @@
+# Environment
 .env
 *.env
+
+# Binaries
+updoc
+server
+updoc-*
 /bin/
+
+# Dependencies
 /vendor/
+
+# Logs
+*.log
+server.log
+
+# OS/IDE
 *.swp
 .DS_store
+.vscode/
+.idea/

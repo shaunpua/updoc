@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/shaunpua/updoc/internal/doc"
-	"github.com/shaunpua/updoc/internal/providers/confluence"
+	"github.com/shaunpua/updoc/internal/services"
 	"github.com/shaunpua/updoc/internal/storage/gormstore"
 	transport "github.com/shaunpua/updoc/internal/transport/http"
 	"gorm.io/driver/postgres"
@@ -26,33 +25,39 @@ func main() {
 
 	// Database configuration with environment variables
 	dsn := getDatabaseURL()
+	log.Printf("Connecting to database with DSN (masked): %s", maskDSN(dsn))
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	
+
 	// Auto-migrate database schema
 	if err := gormstore.AutoMigrate(gormDB); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// Initialize repositories
+	orgRepo := gormstore.NewOrganizationRepo(gormDB)
 	userRepo := gormstore.NewUserRepo(gormDB)
-	if err := userRepo.Ensure("u-123", "demo user"); err != nil {
-		log.Printf("Warning: Failed to ensure demo user: %v", err)
-	}
 
 	// Initialize services
-	confClient := confluence.New()
-	store := gormstore.NewFlagRepo(gormDB)
-	svc := doc.New(confClient, store)
-	
+	orgService := services.NewOrganizationService(orgRepo, userRepo)
+	confluenceService := services.NewConfluenceService(orgRepo)
+
 	// Setup HTTP router
-	e := transport.NewRouter(svc)
+	e := transport.NewRouter()
+	
+	// Add organization endpoints
+	orgHandler := transport.NewOrganizationHandler(orgService, confluenceService)
+	api := e.Group("/api/v1")
+	api.POST("/orgs", orgHandler.CreateOrganization)
+	api.GET("/orgs/:slug", orgHandler.GetOrganization)
+	api.POST("/orgs/:id/test-confluence", orgHandler.TestConfluence)
+	api.GET("/orgs/:id/confluence/pages", orgHandler.ListConfluencePages)
 
 	// Get port from environment
 	port := getEnv("PORT", "9000")
-	
+
 	log.Printf("Starting server on port %s", port)
 	log.Printf("Database: %s", maskDSN(dsn))
 	log.Printf("Confluence: %s", getEnv("CONF_BASE", "not configured"))
@@ -74,7 +79,7 @@ func main() {
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	if err := e.Shutdown(ctx); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
 	} else {
@@ -94,7 +99,8 @@ func getDatabaseURL() string {
 	user := getEnv("POSTGRES_USER", "updoc")
 	password := getEnv("POSTGRES_PASSWORD", "updoc")
 	dbname := getEnv("POSTGRES_DB", "updoc")
-	port := getEnv("POSTGRES_PORT", "5432")
+	// Default to 5433 because docker-compose maps 5433->5432
+	port := getEnv("POSTGRES_PORT", "5433")
 	sslmode := getEnv("POSTGRES_SSLMODE", "disable")
 
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
